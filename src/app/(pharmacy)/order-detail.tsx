@@ -1,7 +1,8 @@
 import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -76,7 +77,7 @@ export default function OrderDetailScreen() {
   const [order, setOrder] = useState<FirestoreOrder | null | 'not-found'>(null);
   const [accepted, setAccepted] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-  const [showRxModal, setShowRxModal] = useState(false);
+  const [rxModalImage, setRxModalImage] = useState<string | null>(null);
   const [showRejectSheet, setShowRejectSheet] = useState(false);
   const [customReason, setCustomReason] = useState('');
   const [deliveryProfile, setDeliveryProfile] = useState<{ name: string; rating: number } | null>(null);
@@ -101,7 +102,7 @@ export default function OrderDetailScreen() {
       const file = new File(Paths.cache, filename);
       file.create({ overwrite: true });
       file.write(base64, { encoding: 'base64' });
-      await Linking.openURL(file.uri);
+      await Sharing.shareAsync(file.uri, { mimeType: 'application/pdf', dialogTitle: 'Ouvrir l\'ordonnance' });
     } catch {
       Alert.alert('Erreur', "L'ordonnance n'a pas pu être ouverte.");
     }
@@ -251,7 +252,7 @@ export default function OrderDetailScreen() {
                     if (ord.type === 'pdf') {
                       handleOpenPdf(ord.base64, ord.name ?? 'ordonnance.pdf');
                     } else {
-                      setShowRxModal(true);
+                      setRxModalImage(ord.base64);
                     }
                   }}
                 >
@@ -271,20 +272,16 @@ export default function OrderDetailScreen() {
           </>
         )}
 
-        {/* Modal ordonnance (image) — shows first image ordonnance */}
-        <Modal visible={showRxModal} transparent animationType="fade" onRequestClose={() => setShowRxModal(false)}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setShowRxModal(false)}>
-            {(() => {
-              const imgOrd = order.ordonnances?.find((o) => o.type === 'image');
-              if (!imgOrd) return null;
-              return (
-                <Image
-                  source={{ uri: `data:image/jpeg;base64,${imgOrd.base64}` }}
-                  style={styles.modalImage}
-                  resizeMode="contain"
-                />
-              );
-            })()}
+        {/* Modal ordonnance (image) */}
+        <Modal visible={!!rxModalImage} transparent animationType="fade" onRequestClose={() => setRxModalImage(null)}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setRxModalImage(null)}>
+            {rxModalImage && (
+              <Image
+                source={{ uri: `data:image/jpeg;base64,${rxModalImage}` }}
+                style={styles.modalImage}
+                resizeMode="contain"
+              />
+            )}
           </Pressable>
         </Modal>
 

@@ -2,6 +2,7 @@ import { File, Paths } from 'expo-file-system';
 import * as DocumentPicker from 'expo-document-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
+import * as Sharing from 'expo-sharing';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -10,7 +11,6 @@ import {
   FlatList,
   Image,
   KeyboardAvoidingView,
-  Linking,
   Modal,
   Platform,
   Pressable,
@@ -81,7 +81,7 @@ function MessageBubble({ message, isMine, onOpenImage }: { message: ChatMessage;
                 const file = new File(Paths.cache, filename);
                 file.create({ overwrite: true });
                 file.write(message.attachmentBase64!, { encoding: 'base64' });
-                await Linking.openURL(file.uri);
+                await Sharing.shareAsync(file.uri, { mimeType: 'application/pdf', dialogTitle: 'Ouvrir le document' });
               } catch {
                 Alert.alert('Erreur', "Le document n'a pas pu être ouvert.");
               }
@@ -171,64 +171,74 @@ export function ConversationScreen() {
     }
   }
 
-  async function handleTakePhoto() {
+  // Waits for the BottomSheet Modal (280ms close animation) to fully dismiss
+  // before opening any native picker — iOS crashes if two native modals overlap.
+  function closeSheetThen(fn: () => void) {
     setAttachSheetVisible(false);
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('Permission refusée', "L'accès à la caméra est nécessaire pour prendre une photo.");
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 });
-    if (result.canceled || !result.assets[0]) return;
-    setProcessingAttachment(true);
-    try {
-      const base64 = await resizeImageToBase64(result.assets[0].uri);
-      await handleSendAttachment({ base64, type: 'image', name: `photo_${Date.now()}.jpg` });
-    } catch {
-      Alert.alert('Erreur', "La photo n'a pas pu être traitée.");
-    } finally {
-      setProcessingAttachment(false);
-    }
+    setTimeout(fn, 350);
   }
 
-  async function handlePickFromGallery() {
-    setAttachSheetVisible(false);
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('Permission refusée', "L'accès à la galerie est nécessaire pour choisir une photo.");
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
-    if (result.canceled || !result.assets[0]) return;
-    setProcessingAttachment(true);
-    try {
-      const base64 = await resizeImageToBase64(result.assets[0].uri);
-      await handleSendAttachment({ base64, type: 'image', name: `photo_${Date.now()}.jpg` });
-    } catch {
-      Alert.alert('Erreur', "La photo n'a pas pu être traitée.");
-    } finally {
-      setProcessingAttachment(false);
-    }
-  }
-
-  async function handlePickPdf() {
-    setAttachSheetVisible(false);
-    const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf' });
-    if (result.canceled || !result.assets[0]) return;
-    const asset = result.assets[0];
-    setProcessingAttachment(true);
-    try {
-      const base64 = await new File(asset.uri).base64();
-      if (base64.length > MAX_PDF_BASE64_LENGTH) {
-        Alert.alert('Fichier trop volumineux', 'Choisissez un PDF de moins de 500 Ko.');
+  function handleTakePhoto() {
+    closeSheetThen(async () => {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission refusée', "L'accès à la caméra est nécessaire pour prendre une photo.");
         return;
       }
-      await handleSendAttachment({ base64, type: 'pdf', name: asset.name });
-    } catch {
-      Alert.alert('Erreur', "Le fichier n'a pas pu être traité.");
-    } finally {
-      setProcessingAttachment(false);
-    }
+      const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 });
+      if (result.canceled || !result.assets[0]) return;
+      setProcessingAttachment(true);
+      try {
+        const base64 = await resizeImageToBase64(result.assets[0].uri);
+        await handleSendAttachment({ base64, type: 'image', name: `photo_${Date.now()}.jpg` });
+      } catch {
+        Alert.alert('Erreur', "La photo n'a pas pu être traitée.");
+      } finally {
+        setProcessingAttachment(false);
+      }
+    });
+  }
+
+  function handlePickFromGallery() {
+    closeSheetThen(async () => {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission refusée', "L'accès à la galerie est nécessaire pour choisir une photo.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
+      if (result.canceled || !result.assets[0]) return;
+      setProcessingAttachment(true);
+      try {
+        const base64 = await resizeImageToBase64(result.assets[0].uri);
+        await handleSendAttachment({ base64, type: 'image', name: `photo_${Date.now()}.jpg` });
+      } catch {
+        Alert.alert('Erreur', "La photo n'a pas pu être traitée.");
+      } finally {
+        setProcessingAttachment(false);
+      }
+    });
+  }
+
+  function handlePickPdf() {
+    closeSheetThen(async () => {
+      const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf' });
+      if (result.canceled || !result.assets[0]) return;
+      const asset = result.assets[0];
+      setProcessingAttachment(true);
+      try {
+        const base64 = await new File(asset.uri).base64();
+        if (base64.length > MAX_PDF_BASE64_LENGTH) {
+          Alert.alert('Fichier trop volumineux', 'Choisissez un PDF de moins de 500 Ko.');
+          return;
+        }
+        await handleSendAttachment({ base64, type: 'pdf', name: asset.name });
+      } catch {
+        Alert.alert('Erreur', "Le fichier n'a pas pu être traité.");
+      } finally {
+        setProcessingAttachment(false);
+      }
+    });
   }
 
   return (

@@ -128,6 +128,8 @@ src/
 - Pour tester sur appareil physique : l'application **Expo Go** ([iOS](https://apps.apple.com/app/expo-go/id982107779) / [Android](https://play.google.com/store/apps/details?id=host.exp.exponent))
 - Pour iOS Simulator : macOS + Xcode
 - Pour Android Emulator : Android Studio
+- **`babel-preset-expo`** (devDependency) — requis pour le bundling Expo
+- **`babel-plugin-module-resolver`** (devDependency) — requis pour la résolution de l'alias `@/`
 
 ---
 
@@ -141,6 +143,8 @@ cd Pharmago
 # 2. Installer les dépendances
 npm install
 ```
+
+> Si l'app ne se lance pas, relancer avec : `npx expo start -c` (vide le cache Metro)
 
 ### Configuration Firebase
 

@@ -14,17 +14,8 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { initializeApp } from 'firebase/app';
-import { initializeAuth, type Persistence } from 'firebase/auth';
+import { getReactNativePersistence, initializeAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-
-// `firebase/auth`'s package.json "exports" map has no "react-native" condition
-// for `getReactNativePersistence`, so it's missing from that module's public
-// type surface even though Metro correctly bundles the React Native build at
-// runtime (via `@firebase/auth`'s own "react-native" condition). Pull the
-// function in directly from the underlying package and type it by hand.
-const { getReactNativePersistence } = require('@firebase/auth') as {
-  getReactNativePersistence: (storage: typeof AsyncStorage) => Persistence;
-};
 
 // ─── REPLACE WITH YOUR REAL CONFIG ───────────────────────────────────────────
 const firebaseConfig = {

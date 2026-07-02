@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -92,12 +93,17 @@ export default function PaymentScreen() {
     total: string;
     deliveryFee: string;
     hasOrdonnance: string;
-    ordonnances: string;
     selectedPaymentMethod: string;
   }>();
 
   const items: OrderItem[] = params.items ? JSON.parse(params.items) : [];
-  const ordonnances: Ordonnance[] = params.ordonnances ? JSON.parse(params.ordonnances) : [];
+  const [ordonnances, setOrdonnances] = useState<Ordonnance[]>([]);
+
+  useEffect(() => {
+    AsyncStorage.getItem('pending_ordonnances').then((raw) => {
+      if (raw) setOrdonnances(JSON.parse(raw));
+    }).catch(() => {});
+  }, []);
   const total = parseFloat(params.total ?? '0');
   const deliveryFee = parseFloat(params.deliveryFee ?? '4.90');
   const subtotal = items.reduce((acc, i) => acc + i.price * i.quantity, 0);
@@ -154,6 +160,7 @@ export default function PaymentScreen() {
         hasOrdonnance: params.hasOrdonnance === 'true',
         ordonnances,
       });
+      await AsyncStorage.removeItem('pending_ordonnances');
 
       router.replace({
         pathname: '/(client)/success' as never,

@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
@@ -167,7 +168,7 @@ export default function OrderScreen() {
     setQuantities((prev) => ({ ...prev, [productId]: next }));
   };
 
-  const handlePay = () => {
+  const handlePay = async () => {
     if (!hasAddress || !selectedAddress) {
       Alert.alert(
         'Adresse manquante',
@@ -202,6 +203,9 @@ export default function OrderScreen() {
       quantity: quantities[p.id] ?? 0,
       price: p.price,
     }));
+    // Ordonnances contain large base64 payloads — too big for URL params.
+    // Store them in AsyncStorage and read them back in payment.tsx.
+    await AsyncStorage.setItem('pending_ordonnances', JSON.stringify(ordonnances));
     router.push({
       pathname: '/(client)/payment' as never,
       params: {
@@ -217,7 +221,6 @@ export default function OrderScreen() {
         total: String(grandTotal.toFixed(2)),
         deliveryFee: String(DELIVERY_FEE),
         hasOrdonnance: needsOrdonnance ? 'true' : 'false',
-        ordonnances: JSON.stringify(ordonnances),
         selectedPaymentMethod,
       },
     });
